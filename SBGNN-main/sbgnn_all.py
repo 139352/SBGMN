@@ -56,7 +56,8 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 parser = argparse.ArgumentParser()
 parser.add_argument('--dirpath', default=BASE_DIR, help='Current Dir')
 parser.add_argument('--device', type=str, default='cuda', help='Devices')
-parser.add_argument('--dataset_name', type=str, default='bonanza-5')
+parser.add_argument('--dataset_name', type=str, default='review-1')
+# parser.add_argument('--batch_size', type=int, default=500, help='Batch Size')
 parser.add_argument('--a_emb_size', type=int, default=32, help='Embeding A Size')
 parser.add_argument('--b_emb_size', type=int, default=32, help='Embeding B Size')
 parser.add_argument('--weight_decay', type=float, default=1e-5, help='Weight Decay')
@@ -64,8 +65,12 @@ parser.add_argument('--lr', type=float, default=0.0005, help='Learning Rate')   
 parser.add_argument('--seed', type=int, default=13, help='Random seed')
 parser.add_argument('--epoch', type=int, default=600, help='Epoch')
 parser.add_argument('--gnn_layer_num', type=int, default=1, help='GNN Layer')
-parser.add_argument('--batch_size', type=int, default=500, help='Batch Size')
-parser.add_argument('--dropout', type=float, default=0.7, help='Dropout')#0.5
+parser.add_argument('--dropout', type=float, default=0.5, help='Dropout')#0.5
+parser.add_argument('--end_loss_rate', type=float, default=0.8, help='Loss rate')
+parser.add_argument('--view_hidden', type=int, default=64, help='view hidden')
+parser.add_argument('--view_relate_rate', type=float, default=0.05, help='view relate rate')
+parser.add_argument('--gnn_kl_rate', type=float, default=0.8, help='gnn kl loss rate')
+
 # parser.add_argument('--agg', type=str, default='AttentionAggregator', choices=['AttentionAggregator', 'MeanAggregator'],
 #                     help='Aggregator')
 args = parser.parse_args()
@@ -373,10 +378,10 @@ class SBGNN(nn.Module):
         self.features_a = nn.Embedding(self.set_a_num, emb_size_a)
         self.features_b = nn.Embedding(self.set_b_num, emb_size_b)
 
-        self.features_a.weight.requires_grad = True
-        self.features_b.weight.requires_grad = True
-        self.multi_left_view_model = GraphSAGE_NET(input_dim=35, hidden=64, output_dim=35)  # 1316
-        self.multi_right_view_model = GraphSAGE_NET(input_dim=35, hidden=64, output_dim=35)  # 1316
+        # self.features_a.weight.requires_grad = True
+        # self.features_b.weight.requires_grad = True
+        self.multi_left_view_model = GraphSAGE_NET(input_dim=35, hidden=args.view_hidden, output_dim=35)  # 1316
+        self.multi_right_view_model = GraphSAGE_NET(input_dim=35, hidden=args.view_hidden, output_dim=35)  # 1316
 
         self.layers_gnn1 = nn.ModuleList(
             [SBGNNLayer(edgelist_a_b_pos, edgelist_a_b_neg, edgelist_b_a_pos, edgelist_b_a_neg,
@@ -439,10 +444,9 @@ class SBGNN(nn.Module):
         # 将 NumPy 数组转换为 PyTorch 张量，并将其移动到 GPU
         tensor = torch.tensor(matrix.todense(), dtype=torch.int32, device=emb_all.device)
 
-
-
         left_matrix = tensor[:self.set_a_num, :self.set_a_num]
-        max_count = int(self.set_a_num * self.set_a_num * 0.1)
+
+        max_count = int(self.set_a_num * self.set_a_num * args.view_relate_rate)
         flattened_matrix = left_matrix.flatten()
         top_k_values, top_k_indices_l = torch.topk(flattened_matrix,
                                                    k=min(max_count, torch.sum(left_matrix > 0)))
@@ -456,7 +460,7 @@ class SBGNN(nn.Module):
             left_edge_index = left_edge_index.view(2, -1)
 
         right_matrix = tensor[self.set_a_num:, self.set_a_num:]
-        max_count = int(self.set_b_num * self.set_b_num * 0.05)
+        max_count = int(self.set_b_num * self.set_b_num * args.view_relate_rate)
         flattened_matrix_r = right_matrix.flatten()
         top_k_values_r, top_k_indices_r = torch.topk(flattened_matrix_r,
                                                      k=min(max_count, torch.sum(right_matrix > 0)))
@@ -501,11 +505,6 @@ class SBGNN(nn.Module):
         y = torch.einsum("ij, ij->i", [embedding_a[edge_lists[:, 0]], embedding_b[edge_lists[:, 1]]])
         y = torch.sigmoid(y)
 
-        # y: 0 ~ 1
-        # embedding_a1: -1.2 ~ 1
-        # embedding_b1: -1.18 ~ 1.3
-        # embedding_a2: -1.2 ~ 1.01
-        # embedding_b2: -1.18 ~ 1.14
         return y, embedding_a1, embedding_b1, embedding_a2, embedding_b2
 
     def multi_gnn_loss(self, embedding_a, embedding_b, embedding_a2, embedding_b2, adjacency_matrix1):
@@ -545,7 +544,7 @@ class SBGNN(nn.Module):
                     * similarity_loss(emb1[j], emb1[top_indices[i, j]])
         adjacency_loss = adjacency_loss / (top_values.shape[0] * top_values.shape[1])  # to mean
 
-        loss = loss_1 + adjacency_loss
+        loss = args.gnn_kl_rate * loss_1 + (1 - args.gnn_kl_rate) * adjacency_loss
         # loss = loss_1
         # loss = adjacency_loss
 
@@ -743,7 +742,8 @@ def run():
         # loss2 = model.view_loss(emb_view_a, emb_view_b)
         loss3 = model.multi_gnn_loss(embedding_a, embedding_b, embedding_a2, embedding_b2, adjacency_matrix1)
 
-        loss = 0.99 * loss1 + 0.01 * loss3
+        end_loss_rate = args.end_loss_rate
+        loss = end_loss_rate * loss1 + (1 - end_loss_rate) * loss3
         # loss = loss1
         loss.backward()
         optimizer.step()
