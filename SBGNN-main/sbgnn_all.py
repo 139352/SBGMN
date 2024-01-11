@@ -8,6 +8,8 @@
 
 import os, sys, random, argparse, subprocess
 os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -30,24 +32,25 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dirpath', default=BASE_DIR, help='Current Dir')
-parser.add_argument('--device', type=str, default='cuda:1', help='Devices')
+parser.add_argument('--device', type=str, default='cuda', help='Devices')
 
 parser.add_argument('--dataset_name', type=str, default='review-1')
-parser.add_argument('--model_type', type=str, default='SBGNNOnlyView') # SBGNN, SBGNNOnlyView, SBGNNOnlyGNN
+parser.add_argument('--model_type', type=str, default='SBGNN') # SBGNN, SBGNNOnlyView, SBGNNOnlyGNN, SBGNN_v1
 
 parser.add_argument('--a_emb_size', type=int, default=32, help='Embeding A Size')
 parser.add_argument('--b_emb_size', type=int, default=32, help='Embeding B Size')
 parser.add_argument('--weight_decay', type=float, default=1e-5, help='Weight Decay')
-parser.add_argument('--lr', type=float, default=0.0005, help='Learning Rate')   # 0.001
-parser.add_argument('--seed', type=int, default=13, help='Random seed')
+parser.add_argument('--lr', type=float, default=0.001, help='Learning Rate')   # 0.001
+parser.add_argument('--seed', type=int, default=2024, help='Random seed')
 parser.add_argument('--epoch', type=int, default=600, help='Epoch')
 
 parser.add_argument('--gnn_layer_num', type=int, default=1, help='GNN Layer')
 parser.add_argument('--dropout', type=float, default=0.7, help='Dropout')#0.5
 parser.add_argument('--end_loss_rate', type=float, default=0.8, help='Loss rate')
-parser.add_argument('--view_hidden', type=int, default=64, help='view hidden')
+parser.add_argument('--gnn_loss_rate', type=float, default=0.4, help='GNNs loss rate')
+parser.add_argument('--view_hidden', type=int, default=64, help='view hidden')   #32
 parser.add_argument('--view_relate_rate', type=float, default=0.1, help='view relate rate')
-parser.add_argument('--gnn_kl_rate', type=float, default=0.8, help='gnn kl loss rate')
+parser.add_argument('--gnn_kl_rate', type=float, default=0.8, help='gnn kl loss rate') #0.8
 
 # parser.add_argument('--agg', type=str, default='AttentionAggregator', choices=['AttentionAggregator', 'MeanAggregator'],
 #                     help='Aggregator')
@@ -200,7 +203,8 @@ def run():
             loss = model.loss(pred_y, train_y)
         else:
             loss1 = model.loss(pred_y, train_y)
-            loss3 = model.multi_gnn_loss(embedding_a, embedding_b, embedding_a2, embedding_b2, adjacency_matrix1)
+            loss3 = model.multi_gnn_loss(
+                embedding_a, embedding_b, embedding_a2, embedding_b2, adjacency_matrix1, args.gnn_loss_rate)
             end_loss_rate = args.end_loss_rate
             loss = end_loss_rate * loss1 + (1 - end_loss_rate) * loss3
         # loss = loss1

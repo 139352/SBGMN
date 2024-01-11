@@ -124,6 +124,28 @@ def create_graph_from_edge_list(edge_list):
     return G
 
 
+def weisfeiler_lehman_labels_from_edge_list_gpu(edge_list, max_iterations, node_num):
+    G = create_graph_from_edge_list(edge_list)
+
+    labels = {}
+    for node in G.nodes():
+        labels[node] = torch.tensor(1, dtype=torch.long, device=edge_list[0].device)
+
+    for iteration in range(max_iterations):
+        new_labels = {}
+        for node in G.nodes():
+            neighbors = sorted(G.neighbors(node))
+            neighbor_labels = torch.tensor([labels[neighbor] for neighbor in neighbors], dtype=torch.long, device=edge_list[0].device)
+            label_string = torch.cat([torch.tensor([labels[node]], dtype=torch.long, device=edge_list[0].device),
+                                      neighbor_labels], dim=0)
+            hash_value = torch.abs(torch.tensor(hash(tuple(label_string.tolist())), dtype=torch.long, device=edge_list[0].device)) % 10000
+            new_labels[node] = hash_value.item()
+
+
+        labels = new_labels
+
+    return labels
+
 def weisfeiler_lehman_labels_from_edge_list(edge_list, max_iterations, node_num):
     """
     从边列表计算 Weisfeiler-Lehman 标签
