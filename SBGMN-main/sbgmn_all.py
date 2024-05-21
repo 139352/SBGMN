@@ -54,9 +54,7 @@ def setup_seed(seed):
     torch.cuda.manual_seed_all(seed)
     torch.backends.cudnn.deterministic = True
 
-# setup seed
-# setup_seed(args.seed)
-# args.device = 'cpu'
+
 args.device = torch.device(args.device)
 
 @torch.no_grad()
@@ -218,7 +216,6 @@ def run():
         print(i, res_best[i], end=' ')
 
 def main():
-    # setup_seed(args.seed)
     print(" ".join(sys.argv))
     this_fpath = os.path.abspath(__file__)
     t = subprocess.run(f'cat {this_fpath}', shell=True, stdout=subprocess.PIPE)
