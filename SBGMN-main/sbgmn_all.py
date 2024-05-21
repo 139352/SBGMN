@@ -1,11 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-@author: huangjunjie
-@file: sbgnn.py
-@time: 2021/03/28
-"""
-
 import os, sys, random, argparse, subprocess
 os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 import matplotlib
@@ -15,45 +7,34 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
-from model import SBGNN, SBGNNOnlyView, SBGNNOnlyGNN
+from model import SBGMN
 from dataset import *
-
 from sklearn.metrics import f1_score, roc_auc_score
-
-# import scipy.sparse as sp
-# from scipy.spatial.distance import pdist, squareform
-
-# import logging
-
-# https://docs.python.org/3/howto/logging.html#logging-advanced-tutorial
-
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dirpath', default=BASE_DIR, help='Current Dir')
-parser.add_argument('--device', type=str, default='cuda', help='Devices')
+parser.add_argument('--device', type=str, default='cuda:1', help='Devices')
 
 parser.add_argument('--dataset_name', type=str, default='review-1')
-parser.add_argument('--model_type', type=str, default='SBGNN') # SBGNN, SBGNNOnlyView, SBGNNOnlyGNN, SBGNN_v1
+parser.add_argument('--model_type', type=str, default='SBGMN') # SBGMN
 
 parser.add_argument('--a_emb_size', type=int, default=32, help='Embeding A Size')
 parser.add_argument('--b_emb_size', type=int, default=32, help='Embeding B Size')
 parser.add_argument('--weight_decay', type=float, default=1e-5, help='Weight Decay')
-parser.add_argument('--lr', type=float, default=0.001, help='Learning Rate')   # 0.001
+parser.add_argument('--lr', type=float, default=0.005, help='Learning Rate')   # 0.001
 parser.add_argument('--seed', type=int, default=2024, help='Random seed')
 parser.add_argument('--epoch', type=int, default=600, help='Epoch')
 
-parser.add_argument('--gnn_layer_num', type=int, default=1, help='GNN Layer')
-parser.add_argument('--dropout', type=float, default=0.7, help='Dropout')#0.5
-parser.add_argument('--end_loss_rate', type=float, default=0.8, help='Loss rate')
-parser.add_argument('--gnn_loss_rate', type=float, default=0.4, help='GNNs loss rate')
-parser.add_argument('--view_hidden', type=int, default=64, help='view hidden')   #32
-parser.add_argument('--view_relate_rate', type=float, default=0.1, help='view relate rate')
+parser.add_argument('--gnn_layer_num', type=int, default=2, help='GNN Layer')  #2
+parser.add_argument('--dropout', type=float, default=0.6, help='Dropout')#0.6
+parser.add_argument('--end_loss_rate', type=float, default=0.8, help='Loss rate')   #0.8
+parser.add_argument('--gnn_loss_rate', type=float, default=0.4, help='GNNs loss rate')   #0.4
+parser.add_argument('--view_hidden', type=int, default=64, help='view hiedden')   # review 16
+parser.add_argument('--view_relate_rate', type=float, default=0.4, help='view relate rate')#0.4
 parser.add_argument('--gnn_kl_rate', type=float, default=0.8, help='gnn kl loss rate') #0.8
 
-# parser.add_argument('--agg', type=str, default='AttentionAggregator', choices=['AttentionAggregator', 'MeanAggregator'],
-#                     help='Aggregator')
 args = parser.parse_args()
 
 # TODO
@@ -66,10 +47,6 @@ for exclude_p in exclude_hyper_params:
 hyper_params = "~".join([f"{k}-{v}" for k, v in hyper_params.items()])
 
 from torch.utils.tensorboard import SummaryWriter
-
-# https://pytorch.org/docs/stable/tensorboard.html
-tb_writer = SummaryWriter(comment=hyper_params)
-
 def setup_seed(seed):
     torch.manual_seed(seed)
     np.random.seed(seed)
@@ -78,7 +55,7 @@ def setup_seed(seed):
     torch.backends.cudnn.deterministic = True
 
 # setup seed
-setup_seed(args.seed)
+# setup_seed(args.seed)
 # args.device = 'cpu'
 args.device = torch.device(args.device)
 
@@ -106,9 +83,6 @@ def test_and_val(pred_y, y, mode='val', epoch=0):
     }
     for k, v in res.items():
         mode, _, metric = k.partition('_')
-        tb_writer.add_scalar(f'{metric}/{mode}', v, epoch)
-    # tb_writer.add_scalar( f'{mode}_auc', auc, epoch)
-    # tb_writer.add_scalar( f'{mode}_f1', auc, epoch)
     return res
 
 
@@ -130,9 +104,6 @@ def plot_curve(result_dir, x_list, y_list, mode,
     plt.savefig(f'{result_dir}/{mode}-curve.png')
 
 def run():
-    result_dir = f'result/{args.model_type}/{args.dataset_name}'
-    os.makedirs(result_dir, exist_ok=True)
-
     train_edgelist, val_edgelist, test_edgelist = load_data(args.dataset_name)
 
     set_a_num, set_b_num = DATA_EMB_DIC[args.dataset_name]
@@ -149,19 +120,16 @@ def run():
     edgelist_a_b_pos, edgelist_a_b_neg, edgelist_b_a_pos, edgelist_b_a_neg, \
     edgelist_pos, edgelist_neg = edgelists
 
-    # if args.agg == 'MeanAggregator':
-    #     agg = MeanAggregator
-    # else:
-
-    #     agg = AttentionAggregator
-
     model = eval(args.model_type)(edgelists,
                   dataset_name=args.dataset_name,
                   layer_num=args.gnn_layer_num,
                   view_hidden=args.view_hidden,
+                  emb_size_a=args.a_emb_size,
+                  emb_size_b=args.b_emb_size,
                   dropout=args.dropout,
                   view_relate_rate=args.view_relate_rate,
-                  device=args.device)
+                  device=args.device
+                                  )
     model = model.to(args.device)
 
     # print(model.train())
@@ -169,8 +137,9 @@ def run():
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epoch, eta_min=1e-8)
 
     res_best = {'val_auc': 0}
+    # res_best = {'val_auc': 0, 'val_f1': 0}
 
-    if args.model_type != 'SBGNNOnlyView':
+    if args.model_type != 'SBGMNOnlyView' and args.model_type != 'SBGMNOnlyView_WL':
         all_nodes = list(set(edgelist_pos.keys()).union(*edgelist_pos.values()))
         # 创建邻接矩阵
         adjacency_matrix1 = np.zeros((len(all_nodes), len(all_nodes)))
@@ -184,10 +153,6 @@ def run():
         adjacency_matrix1 = torch.matmul(adjacency_matrix1, adjacency_matrix1)
         adjacency_matrix1.fill_diagonal_(0)
 
-        # think
-        # adjacency_matrix1[:self.set_a_num, self.set_a_num:] = 0
-        # adjacency_matrix1[self.set_a_num:, :self.set_a_num] = 0
-
     auc_trainvalues, auc_valvalues, auc_testvalues = [], [], []
     f1_trainvalues, f1_valvalues, f1_testvalues = [], [], []
     macro_trainvalues, macro_valvalues, macro_testvalues = [], [], []
@@ -199,7 +164,7 @@ def run():
         optimizer.zero_grad()
         pred_y, embedding_a, embedding_b, embedding_a2, embedding_b2 = model(train_edgelist)
 
-        if args.model_type == 'SBGNNOnlyView':
+        if args.model_type == 'SBGMNOnlyView' or args.model_type == 'SBGMNOnlyView_WL':
             loss = model.loss(pred_y, train_y)
         else:
             loss1 = model.loss(pred_y, train_y)
@@ -246,28 +211,14 @@ def run():
                 res_best = res_cur
             print(res_cur)
 
-        plot_curve(result_dir, [np.arange(0, epoch)] * 3,
-                   [auc_trainvalues, auc_valvalues, auc_testvalues], 'AUC')
-
-        plot_curve(result_dir, [np.arange(0, epoch)] * 3,
-                   [f1_trainvalues, f1_valvalues, f1_testvalues], 'f1')
-
-        plot_curve(result_dir, [np.arange(0, epoch)] * 3,
-                   [macro_trainvalues, macro_valvalues, macro_testvalues], 'macro')
-
-        plot_curve(result_dir, [np.arange(0, epoch)] * 3,
-                   [micro_trainvalues, micro_valvalues, micro_testvalues], 'micro')
-
     print('Done! Best Results:')
     print(res_best)
     print_list = ['test_auc', 'test_f1', 'test_macro_f1', 'test_micro_f1']
     for i in print_list:
         print(i, res_best[i], end=' ')
 
-    with open(result_dir + '/args.log', 'w') as f:
-        f.write(str(args))
-
 def main():
+    # setup_seed(args.seed)
     print(" ".join(sys.argv))
     this_fpath = os.path.abspath(__file__)
     t = subprocess.run(f'cat {this_fpath}', shell=True, stdout=subprocess.PIPE)

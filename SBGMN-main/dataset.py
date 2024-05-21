@@ -5,9 +5,6 @@ from common import DATA_EMB_DIC
 
 # =========== function
 def load_data(dataset_name):
-    # train_file_path = os.path.join('experiments-data', f'{dataset_name}_training.txt')
-    # val_file_path = os.path.join('experiments-data', f'{dataset_name}_validation.txt')
-    # test_file_path = os.path.join('experiments-data', f'{dataset_name}_testing.txt')
     train_file_path = os.path.join('datasets', f'{dataset_name}_training.txt')
     val_file_path = os.path.join('datasets', f'{dataset_name}_val.txt')
     test_file_path = os.path.join('datasets', f'{dataset_name}_test.txt')
@@ -16,21 +13,18 @@ def load_data(dataset_name):
     train_edgelist = []
     with open(train_file_path) as f:
         for ind, line in enumerate(f):
-            # if ind == 0: continue
             a, b, s = map(int, line.split('\t'))
             train_edgelist.append((a, b, s))
 
     val_edgelist = []
     with open(val_file_path) as f:
         for ind, line in enumerate(f):
-            # if ind == 0: continue
             a, b, s = map(int, line.split('\t'))
             val_edgelist.append((a, b, s))
 
     test_edgelist = []
     with open(test_file_path) as f:
         for ind, line in enumerate(f):
-            # if ind == 0: continue
             a, b, s = map(int, line.split('\t'))
             test_edgelist.append((a, b, s))
 
@@ -44,8 +38,6 @@ def load_edgelists(edge_lists, dataset_name):
     edgelist_pos, edgelist_neg = defaultdict(list), defaultdict(list)
     edgelist_a_a_pos, edgelist_a_a_neg = defaultdict(list), defaultdict(list)
     edgelist_b_b_pos, edgelist_b_b_neg = defaultdict(list), defaultdict(list)
-    # edgelist_a_b_pos2, edgelist_a_b_neg2 = defaultdict(list), defaultdict(list)
-    # edgelist_b_a_pos2, edgelist_b_a_neg2 = defaultdict(list), defaultdict(list)
 
     set_a_num, set_b_num = DATA_EMB_DIC[dataset_name]
     for a, b, s in edge_lists:
@@ -54,15 +46,11 @@ def load_edgelists(edge_lists, dataset_name):
             edgelist_b_a_pos[b].append(a)
             edgelist_pos[a].append(b+set_a_num)
             edgelist_pos[b+set_a_num].append(a)
-            # edgelist_a_b_pos2[a].append(b+515)
-            # edgelist_b_a_pos2[b+515].append(a)
         elif s == -1:
             edgelist_a_b_neg[a].append(b)
             edgelist_b_a_neg[b].append(a)
             edgelist_neg[a].append(b+set_a_num)
             edgelist_neg[b+set_a_num].append(a)
-            # edgelist_a_b_neg2[a].append(b+515)
-            # edgelist_b_a_neg2[b+515].append(a)
         else:
             # print(a, b, s)
             raise Exception("s must be -1/1")

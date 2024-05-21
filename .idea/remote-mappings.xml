@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="RemoteMappingsManager">
+    <list>
+      <list>
+        <remote-mappings server-id="python@sftp://peimin@10.21.16.124:22/home/peimin/miniconda3/envs/MAGCN/bin/python" />
+        <remote-mappings server-id="python@sftp://yuanyjiang@10.21.16.126:22/home/yuanyjiang/miniconda3/envs/MAGCN/bin/python">
+          <settings>
+            <list>
+              <mapping local-root="$PROJECT_DIR$" remote-root="/home/yuanyjiang/project/SBGNN-main" />
+            </list>
+          </settings>
+        </remote-mappings>
+        <remote-mappings server-id="python@sftp://xuzhangyi@10.21.16.123:22/home/xuzhangyi/miniconda3/envs/MAGCN/bin/python">
+          <settings>
+            <list>
+              <mapping local-root="$PROJECT_DIR$" remote-root="/home/xuzhangyi/project/SBGNN-main111" />
+            </list>
+          </settings>
+        </remote-mappings>
+        <remote-mappings server-id="python@sftp://xuzhangyi@10.21.16.123:22/home/xuzhangyi/miniconda3/envs/sbgnn1/bin/python" />
+        <remote-mappings server-id="python@sftp://yuanyjiang@10.21.16.123:22/home/yuanyjiang/miniconda3/envs/sbgnn1/bin/python" />
+        <remote-mappings server-id="python@sftp://yuanyjiang@10.21.16.122:22/home/yuanyjiang/miniconda3/envs/sbgnn0/bin/python" />
+        <remote-mappings server-id="python@sftp://yuanyjiang@10.21.16.122:22/home/yuanyjiang/miniconda3/envs/sbgnn2/bin/python">
+          <settings>
+            <list>
+              <mapping local-root="$PROJECT_DIR$" remote-root="/home/yuanyjiang/project/SBGNN-main111" />
+            </list>
+          </settings>
+        </remote-mappings>
+        <remote-mappings server-id="python@sftp://yuanyjiang@10.21.16.122:22/home/yuanyjiang/miniconda3/envs/sbgnn1/bin/python">
+          <settings>
+            <list>
+              <mapping local-root="$PROJECT_DIR$" remote-root="/home/yuanyjiang/project/gcn2" />
+            </list>
+          </settings>
+        </remote-mappings>
+      </list>
+    </list>
+  </component>
+</project>
